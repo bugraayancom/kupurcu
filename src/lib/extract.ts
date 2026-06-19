@@ -1,4 +1,4 @@
-import { JSDOM } from "jsdom";
+import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
 import { generateObject } from "ai";
 import { ArticleExtractionSchema, type Article } from "./types";
@@ -46,8 +46,8 @@ function absolutize(src: string, baseUrl: string): string | null {
 
 /** Readability içeriğinden aday görselleri sırayla topla. */
 function collectImages(contentHtml: string, baseUrl: string): CandidateImage[] {
-  const dom = new JSDOM(contentHtml);
-  const imgs = Array.from(dom.window.document.querySelectorAll("img"));
+  const { document } = parseHTML(contentHtml);
+  const imgs = Array.from(document.querySelectorAll("img"));
   const seen = new Set<string>();
   const out: CandidateImage[] = [];
   for (const img of imgs) {
@@ -234,9 +234,17 @@ export interface ExtractResult {
 }
 
 function runReadability(html: string, url: string) {
-  const dom = new JSDOM(html, { url });
-  const doc = dom.window.document;
-  const reader = new Readability(doc.cloneNode(true) as Document);
+  // linkedom: saf-JS DOM, serverless'ta jsdom'un ESM/native sorunları olmadan çalışır.
+  // Göreli URL çözümü için <base> ekleyelim (linkedom documentURI ayarlamaz).
+  const baseTag = `<base href="${url.replace(/"/g, "&quot;")}">`;
+  const withBase = /<head[^>]*>/i.test(html)
+    ? html.replace(/<head[^>]*>/i, (m) => m + baseTag)
+    : baseTag + html;
+  const { document } = parseHTML(withBase);
+  const doc = document as unknown as Document;
+  // Readability DOM'u değiştirir; orijinali görsel/meta için koruyalım diye klonla
+  const clone = doc.cloneNode(true) as Document;
+  const reader = new Readability(clone);
   return { doc, parsed: reader.parse() };
 }
 
