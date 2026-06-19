@@ -23,8 +23,21 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       });
-      const data = await res.json();
+      // Yanıtı önce metin olarak al; JSON değilse (ör. sunucu yeniden
+      // derleniyorken dönen HTML hata sayfası) anlaşılır bir mesaj göster.
+      const raw = await res.text();
+      let data: { article?: Article; warning?: string; error?: string };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          res.ok
+            ? "Sunucudan beklenmeyen bir yanıt geldi. Sunucu yeniden başlıyor olabilir; lütfen birkaç saniye sonra tekrar deneyin."
+            : `Sunucu hatası (${res.status}). Lütfen tekrar deneyin.`
+        );
+      }
       if (!res.ok) throw new Error(data.error || "Bilinmeyen hata");
+      if (!data.article) throw new Error("Haber içeriği alınamadı.");
       setArticle(data.article);
       setWarning(data.warning ?? null);
     } catch (err) {
