@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# İletişim Başkanlığı iç dokümanları (public repoya dahil edilmez)
+*.docx
+DES*

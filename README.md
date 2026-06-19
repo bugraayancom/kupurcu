@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Haber → Temiz PDF Aracı
 
-## Getting Started
+Haber sayfalarından **reklam, menü, "ilgili haberler" ve çerez uyarılarından arınmış**, görselli ve düzenli bir PDF üretir. Tercümanların ekran görüntüsü alıp reklam temizlemekle uğraşmasına gerek kalmaz.
 
-First, run the development server:
+## Nasıl çalışır?
+
+1. **Çekme** — Sayfa tarayıcı taklidi başlıklarla indirilir.
+2. **Kaba temizlik** — [Mozilla Readability](https://github.com/mozilla/readability) reklam/menü/footer'ın büyük kısmını atar.
+3. **Yapay zekâ ile yorumlama** — Temizlenmiş metin Claude'a verilir; geriye kalan reklam/abonelik/paylaşım kalıntılarını ayıklar, haberi başlık + spot + gövde + görsel olarak yapılandırır. (Geçen yıl zayıf kalan adım; artık modele _ham HTML değil_, ön-temizlenmiş metin verildiği için çok daha isabetli.)
+4. **PDF** — `@react-pdf/renderer` ile tam Türkçe karakter desteğiyle (DejaVu Sans) temiz bir belge üretilir.
+
+> Metin **çevrilmez veya özetlenmez** — kaynak dilde, olduğu gibi korunur; çeviriyi tercüman yapar.
+
+## Kurulum
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` içine **Vercel AI Gateway** anahtarınızı girin:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+AI_GATEWAY_API_KEY=...
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Anahtar: [vercel.com/dashboard](https://vercel.com/dashboard) → **AI Gateway** → **API Keys**. Claude modellerine bu kapıdan erişilir; ayrıca doğrudan Anthropic anahtarı kurmaya gerek yoktur.
 
-## Learn More
+Çalıştırma:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run dev      # http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Model seçimi
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Varsayılan: `anthropic/claude-sonnet-4-6` (hızlı, isabetli). Daha zor sayfalar için `.env.local` ile yükseltin:
 
-## Deploy on Vercel
+```
+EXTRACT_MODEL=anthropic/claude-opus-4-8
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Bilinen sınır
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- İçeriğini **tamamen JavaScript ile** yükleyen siteler (bazı SPA haber siteleri) düz çekimde boş gelebilir. Bu durumda arayüz uyarı gösterir. Gerekirse ileride headless tarayıcıyla (Playwright / Vercel Sandbox) çekim eklenebilir.
+
+## Dağıtım (Vercel)
+
+```bash
+vercel
+```
+
+Üretimde `AI_GATEWAY_API_KEY` yerine Vercel'in OIDC token'ı otomatik kullanılabilir; ayrı anahtar gerekmez. Font dosyaları `next.config.ts` içindeki `outputFileTracingIncludes` ile PDF fonksiyonuna dahil edilir.
+
+## Proje yapısı
+
+```
+src/
+  app/
+    page.tsx                 Arayüz (URL gir → önizleme → PDF indir)
+    api/extract/route.ts     Çekme + Readability + Claude yapılandırma
+    api/image/route.ts       Görsel proxy (CORS/referrer aşımı)
+    api/pdf/route.ts         PDF üretimi
+  lib/
+    extract.ts               Çekirdek çıkarma mantığı
+    pdf.tsx                  PDF belge şablonu
+    types.ts                 Şema + tipler
+fonts/                       DejaVu Sans (tam Türkçe karakter desteği)
+```
